@@ -10,68 +10,74 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 (function(document) {
   'use strict';
 
-  // Grab a reference to our auto-binding template
-  // and give it some initial binding values
-  // Learn more about auto-binding templates at http://goo.gl/Dx1u2g
-  var app = document.querySelector('#app');
+  var webComponentsSupported = ('registerElement' in document
+    && 'import' in document.createElement('link')
+    && 'content' in document.createElement('template'));
 
-  // Sets app default base URL
-  app.baseUrl = '/';
-  if (window.location.port === '') {  // if production
-    // Uncomment app.baseURL below and
-    // set app.baseURL to '/your-pathname/' if running from folder in production
-    app.baseUrl = '/exoplanet-explorer/';
+  if (!webComponentsSupported) {
+    loadWebComponentPolyfill().then(loadSequence);
+  } else {
+    loadSequence();
   }
 
-  app.displayInstalledToast = function() {
-    // Check to make sure caching is actually enabled—it won't be in the dev environment.
-    if (!document.querySelector('platinum-sw-cache').disabled) {
-      document.querySelector('#caching-complete').show();
-    }
+  function loadWebComponentPolyfill(cb) {
+    return new Promise(function(resolve, reject) {
+      var polyfill = document.createElement('script');
+      polyfill.src = 'bower_components/webcomponentsjs/webcomponents-lite.min.js';
+      polyfill.onload = resolve;
+      polyfill.onerror = reject;
+      document.head.appendChild(polyfill);
+    });
+  }
+
+  function loadElements() {
+    return new Promise(function(resolve, reject) {
+      var bundle = document.createElement('link');
+      bundle.rel = 'import';
+      bundle.href = '../elements/elements.html';
+      bundle.onload = resolve;
+      bundle.onerror = reject;
+      document.head.appendChild(bundle);
+    });
+  }
+
+  function loadBody() {
+    return new Promise(function(resolve, reject) {
+      var req = new XMLHttpRequest();
+      req.open('GET', 'body.html');
+      req.addEventListener('load', function () {
+        // Add Polymer specific classes to the body
+        document.body.classList.add('fullbleed', 'layout', 'vertical');
+        document.body.setAttribute('unresolved', true);
+        document.body.innerHTML = this.responseText;
+        resolve();
+      });
+      req.addEventListener('error', function () {
+        throw new Error('Body Request Error');
+        reject();
+      });
+      req.send();
+    });
   };
 
-  // Listen for template bound event to know when bindings
-  // have resolved and content has been stamped to the page
-  app.addEventListener('dom-change', function() {
-    // Something interesting could happen here
-  });
+  function loadScripts() {
+    return new Promise(function(resolve, reject) {
+      var script = document.createElement('script');
+      script.src = 'scripts/body-app.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  }
 
-  // Main area's paper-scroll-header-panel custom condensing transformation of
-  // the appName in the middle-container and the bottom title in the bottom-container.
-  // The appName is moved to top and shrunk on condensing. The bottom sub title
-  // is shrunk to nothing on condensing.
-  addEventListener('paper-header-transform', function(e) {
-    var appName = document.querySelector('#mainToolbar .app-name');
-    var middleContainer = document.querySelector('#mainToolbar .middle-container');
-    var bottomContainer = document.querySelector('#mainToolbar .bottom-container');
-    var detail = e.detail;
-    var heightDiff = detail.height - detail.condensedHeight;
-    var yRatio = Math.min(1, detail.y / heightDiff);
-    var maxMiddleScale = 0.50;  // appName max size when condensed. The smaller the number the smaller the condensed size.
-    var scaleMiddle = Math.max(maxMiddleScale, (heightDiff - detail.y) / (heightDiff / (1-maxMiddleScale))  + maxMiddleScale);
-    var scaleBottom = 1 - yRatio;
-
-    // Move/translate middleContainer
-    Polymer.Base.transform('translate3d(0,' + yRatio * 100 + '%,0)', middleContainer);
-
-    // Scale bottomContainer and bottom sub title to nothing and back
-    Polymer.Base.transform('scale(' + scaleBottom + ') translateZ(0)', bottomContainer);
-
-    // Scale middleContainer appName
-    Polymer.Base.transform('scale(' + scaleMiddle + ') translateZ(0)', appName);
-  });
-
-  // Close drawer after menu item is selected if drawerPanel is narrow
-  app.onDataRouteClick = function() {
-    var drawerPanel = document.querySelector('#paperDrawerPanel');
-    if (drawerPanel.narrow) {
-      drawerPanel.closeDrawer();
-    }
-  };
-
-  // Scroll page to top and expand header
-  app.scrollPageToTop = function() {
-    document.getElementById('mainContainer').scrollTop = 0;
+  function loadSequence() {
+    return new Promise(function(resolve, reject) {
+      // loadElements().then(loadBody).then(loadScripts);
+      loadBody().then(loadScripts);
+    })
+    .catch(function() {
+      throw new Error('Page Load Error');
+    });
   };
 
 })(document);

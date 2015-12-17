@@ -166,7 +166,7 @@ gulp.task('html', function () {
 // Polybuild will take care of inlining HTML imports,
 // scripts and CSS for you.
 gulp.task('vulcanize', function () {
-  return gulp.src('dist/index.html')
+  return gulp.src(['dist/*.html'])
     .pipe(polybuild({maximumCrush: true}))
     .pipe(gulp.dest('dist/'));
 });
